@@ -2,8 +2,13 @@ name: YouTube Auto Uploader
 
 on:
   schedule:
-    - cron: '0 8,14 * * *' # Roz subah 8 baje aur dopehar 2 baje (UTC time) chalega
-  workflow_dispatch: # Manual Button
+    # UTC Times convert kiye gaye hain IST ke liye:
+    # 03:00 UTC = 08:30 AM IST (Subah)
+    # 09:00 UTC = 02:30 PM IST (Dopehar)
+    # 14:00 UTC = 07:30 PM IST (Shaam)
+    - cron: '0 3,9,14 * * *'
+  
+  workflow_dispatch: # Manual button abhi bhi rahega
 
 jobs:
   run-bot:
