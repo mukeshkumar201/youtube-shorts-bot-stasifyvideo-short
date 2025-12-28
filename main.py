@@ -94,7 +94,7 @@ This oddly satisfying video will help you relax, sleep, and relieve stress.
 Enjoy the visual ASMR triggers! 🎧✨
 
 👇 SUBSCRIBE for Daily Relaxation!
-https://www.youtube.com/@YOUR_CHANNEL_HANDLE?sub_confirmation=1
+https://www.youtube.com/channel/UCyOFXSUnnR6-De_Xo4yTxBA
 
 ---
 #shorts #satisfying #oddlysatisfying #asmr #relaxing #stressrelief #calming #sleep #visualasmr #crunchy #viral #trending #cleaning #slime #satisfyingvideo
