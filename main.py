@@ -1,4 +1,5 @@
 import os
+import random  # <-- Ye naya import hai random title ke liye
 import google.auth.transport.requests
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -12,15 +13,13 @@ SOURCE_FOLDER = os.environ["DRIVE_FOLDER_ID"]
 DEST_FOLDER = os.environ["DONE_FOLDER_ID"]
 
 def get_services():
-    # Token Refresh Logic
     creds = Credentials(
-        None, # Access token nahi hai, hum refresh karenge
+        None,
         refresh_token=REFRESH_TOKEN,
         token_uri="https://oauth2.googleapis.com/token",
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET
     )
-    # Token expire ho gaya to refresh karein
     if not creds.valid:
         request = google.auth.transport.requests.Request()
         creds.refresh(request)
@@ -43,8 +42,8 @@ def main():
             print("No videos found to upload.")
             return
 
-        video = files[0] # Pehli video uthao
-        print(f"Found video: {video['name']}")
+        video = files[0]
+        print(f"Found video file: {video['name']}")
 
         # 3. Video Download Karna
         print("Downloading video...")
@@ -52,19 +51,70 @@ def main():
         with open("video.mp4", "wb") as f:
             f.write(request.execute())
 
-        # 4. YouTube par Upload Karna
-        print("Uploading to YouTube Shorts...")
-        title = video['name'].replace(".mp4", "").replace("_", " ") # Clean filename
+        # 4. RANDOM TITLE GENERATOR (Magic Yahan Hai)
+        print("Generating Viral Title...")
+
+        # Ye wo list hai jisme se bot title pick karega
+        viral_titles_list = [
+            "Oddly Satisfying Video to Relax 🤤",
+            "The Most Satisfying Video Ever! ✨",
+            "Relaxing Visuals for Stress Relief 🎧",
+            "Can You Watch This Without Tingles? 😴",
+            "Deeply Satisfying ASMR 💤",
+            "Satisfying Art That Relaxes You ✨",
+            "This Will Make You Sleep Instantly 🌙",
+            "Oddly Satisfying Things 🤤",
+            "Brain Massage: Visual ASMR 🧠",
+            "Ultimate Stress Relief Video 💆‍♂️",
+            "Satisfying Cleaning & Crushing 💥",
+            "Wait for the end... So Satisfying! 😱",
+            "Instant Stress Relief (100% Works) ✨",
+            "Smooth and Relaxing Moments 🧊",
+            "Why is this so satisfying? 🧐",
+            "Video to Calm Your Anxiety 💖",
+            "Perfectly Satisfying Shorts 💯",
+            "Pure Satisfaction for Your Brain 🧠✨",
+            "Daily Dose of Satisfaction 💊",
+            "You Need to Watch This! 😲"
+        ]
+
+        # Randomly ek title chuno
+        selected_title = random.choice(viral_titles_list)
         
+        # Title ke aage hashtags lagao
+        final_title = f"{selected_title} #Shorts #Satisfying"
+
+        print(f"Selected Title: {final_title}")
+
+        # --- DESCRIPTION ---
+        description_text = f"""
+{selected_title}
+
+This oddly satisfying video will help you relax, sleep, and relieve stress. 
+Enjoy the visual ASMR triggers! 🎧✨
+
+👇 SUBSCRIBE for Daily Relaxation!
+https://www.youtube.com/@YOUR_CHANNEL_HANDLE?sub_confirmation=1
+
+---
+#shorts #satisfying #oddlysatisfying #asmr #relaxing #stressrelief #calming #sleep #visualasmr #crunchy #viral #trending #cleaning #slime #satisfyingvideo
+"""
+
+        viral_tags = [
+            'shorts', 'satisfying', 'oddly satisfying', 'asmr', 'relaxing', 
+            'stress relief', 'calming', 'sleep', 'visual asmr', 'crunchy', 
+            'slime', 'soap cutting', 'sand', 'viral', 'trending', 'youtube shorts'
+        ]
+
         body = {
             'snippet': {
-                'title': f"{title} #Shorts #FunnyAnimals",
-                'description': "Subscribe for more funny animal videos! #Shorts #Animals",
-                'tags': ['shorts', 'funny', 'animals', 'cute'],
-                'categoryId': '15' # Pets & Animals category
+                'title': final_title,  
+                'description': description_text,
+                'tags': viral_tags,
+                'categoryId': '24' # Entertainment
             },
             'status': {
-                'privacyStatus': 'public', # 'private' rakhein agar test karna ho
+                'privacyStatus': 'public', 
                 'selfDeclaredMadeForKids': False
             }
         }
@@ -78,7 +128,7 @@ def main():
 
         print(f"Uploaded Successfully! Video ID: {upload['id']}")
 
-        # 5. Video Move Karna (Queue -> Done)
+        # 5. Video Move Karna
         print("Moving video to Done folder...")
         file = drive.files().get(fileId=video['id'], fields='parents').execute()
         previous_parents = ",".join(file.get('parents'))
@@ -92,7 +142,6 @@ def main():
 
     except Exception as e:
         print(f"Error aa gaya: {e}")
-        # Error aaye to fail kar do taaki GitHub email bheje
         exit(1)
 
 if __name__ == "__main__":
