@@ -1,35 +1,59 @@
-name: YouTube Auto Uploader
+name: Satisfying Bot Auto Uploader
 
 on:
   schedule:
-    # UTC Times convert kiye gaye hain IST ke liye:
-    # 03:00 UTC = 08:30 AM IST (Subah)
-    # 09:00 UTC = 02:30 PM IST (Dopehar)
-    # 14:00 UTC = 07:30 PM IST (Shaam)
-    - cron: '0 3,9,14 * * *'
+    # --- 4 Baar Post Karne Ka Schedule (UTC Time) ---
+    # India Time (IST) ke hisaab se:
+    - cron: '30 3 * * *'   # 9:00 AM IST
+    - cron: '30 7 * * *'   # 1:00 PM IST
+    - cron: '30 11 * * *'  # 5:00 PM IST
+    - cron: '30 15 * * *'  # 9:00 PM IST
   
-  workflow_dispatch: # Manual button abhi bhi rahega
+  workflow_dispatch:      # Manual 'Run' button
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Python Setup
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Install Libraries
-        run: pip install -r requirements.txt
+      # IMPORTANT: Ye step Video Editing ke liye zaroori hai
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
 
-      - name: Run Script 
+      - name: Install Libraries (Direct Mode)
+        run: |
+          # Pehle pip update karte hain
+          python -m pip install --upgrade pip setuptools wheel
+          
+          # Direct install taaki version conflict na ho (Stable List)
+          pip install google-api-python-client google-auth-oauthlib google-auth-httplib2 requests moviepy==1.0.3 "numpy<2.0.0" instagrapi==1.17.0
+
+      - name: Run Script
         env:
-          CLIENT_ID: ${{ secrets.CLIENT_ID }}
-          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
-          REFRESH_TOKEN: ${{ secrets.REFRESH_TOKEN }}
-          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-          DONE_FOLDER_ID: ${{ secrets.DONE_FOLDER_ID }}
+          # Left Side: Python Code ka naam  |  Right Side: Tumhare GitHub Secret ka naam
+          
+          # Google Auth
+          G_CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          G_CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+          G_REFRESH_TOKEN: ${{ secrets.REFRESH_TOKEN }}
+          
+          # Drive Folders
+          DRIVE_QUEUE_FOLDER: ${{ secrets.DRIVE_FOLDER_ID }}
+          DRIVE_DONE_FOLDER: ${{ secrets.DONE_FOLDER_ID }}
+          
+          # Instagram Secrets (Ensure ye secrets tumne add kiye ho)
+          INSTA_USERNAME: ${{ secrets.INSTA_USERNAME }}
+          INSTA_PASSWORD: ${{ secrets.INSTA_PASSWORD }}
+          INSTA_SETTINGS: ${{ secrets.INSTA_SETTINGS }}
+        
         run: python main.py
