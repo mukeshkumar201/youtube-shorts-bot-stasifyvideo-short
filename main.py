@@ -1,148 +1,190 @@
 import os
-import random  # <-- Ye naya import hai random title ke liye
-import google.auth.transport.requests
+import json
+import random
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
+from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
+from instagrapi import Client
 
-# 1. GitHub Secrets se Data lena
-CLIENT_ID = os.environ["CLIENT_ID"]
-CLIENT_SECRET = os.environ["CLIENT_SECRET"]
-REFRESH_TOKEN = os.environ["REFRESH_TOKEN"]
-SOURCE_FOLDER = os.environ["DRIVE_FOLDER_ID"]
-DEST_FOLDER = os.environ["DONE_FOLDER_ID"]
+# --- VIDEO EDITING ---
+from moviepy.editor import VideoFileClip, vfx
 
-def get_services():
+# --- 1. SETUP GOOGLE LOGIN ---
+def get_google_services():
+    # Note: Maine variable names standardize kar diye hain (G_CLIENT_ID etc.)
+    # Taaki YAML file same rahe.
     creds = Credentials(
         None,
-        refresh_token=REFRESH_TOKEN,
+        refresh_token=os.environ['G_REFRESH_TOKEN'],
         token_uri="https://oauth2.googleapis.com/token",
-        client_id=CLIENT_ID,
-        client_secret=CLIENT_SECRET
+        client_id=os.environ['G_CLIENT_ID'],
+        client_secret=os.environ['G_CLIENT_SECRET']
     )
-    if not creds.valid:
-        request = google.auth.transport.requests.Request()
-        creds.refresh(request)
+    return build('drive', 'v3', credentials=creds), build('youtube', 'v3', credentials=creds)
+
+# --- 2. PRO EDITING FUNCTION (Speed + Color + Border) ---
+def process_video(raw_path, final_path):
+    print("🎬 Editing Started: Speed, Color & Border...")
     
-    drive = build('drive', 'v3', credentials=creds)
-    youtube = build('youtube', 'v3', credentials=creds)
-    return drive, youtube
+    # 1. Video Load
+    clip = VideoFileClip(raw_path)
+    
+    # 2. Speed 1.1x (Copyright Protection)
+    clip = clip.fx(vfx.speedx, 1.1)
+    
+    # 3. Filter (Color Vibrance)
+    clip = clip.fx(vfx.colorx, 1.2)
+    
+    # 4. Border (White Gap - Aesthetic Look)
+    clip = clip.margin(top=40, bottom=40, left=40, right=40, color=(255, 255, 255))
+    
+    # 5. Save Final Video
+    clip.write_videofile(
+        final_path, 
+        codec="libx264", 
+        audio_codec="aac", 
+        fps=24,
+        verbose=False, 
+        logger=None
+    )
+    print("✅ Video Processing Complete!")
 
+# --- MAIN LOGIC ---
 def main():
+    print("🚀 Satisfying Bot (Pro Version) Started...")
+
+    # -- DRIVE SETUP --
     try:
-        drive, youtube = get_services()
-        print("Login Successful!")
+        drive, youtube = get_google_services()
+        # Secrets ke naam check kar lena
+        queue_folder_id = os.environ['DRIVE_QUEUE_FOLDER'] 
+        done_folder_id = os.environ['DRIVE_DONE_FOLDER']
+    except Exception as e:
+        print(f"❌ Login Error: {e}")
+        return
 
-        # 2. Drive Check Karna
-        query = f"'{SOURCE_FOLDER}' in parents and mimeType contains 'video/' and trashed=false"
-        results = drive.files().list(q=query, fields="files(id, name)").execute()
-        files = results.get('files', [])
+    # -- CHECK FOR VIDEO --
+    print("🔍 Checking Drive for videos...")
+    results = drive.files().list(
+        q=f"'{queue_folder_id}' in parents and mimeType contains 'video/' and trashed=false",
+        fields="files(id, name)",
+        pageSize=1
+    ).execute()
+    items = results.get('files', [])
 
-        if not files:
-            print("No videos found to upload.")
-            return
+    if not items:
+        print("❌ Folder Khali Hai (No Videos).")
+        return
 
-        video = files[0]
-        print(f"Found video file: {video['name']}")
+    video_file = items[0]
+    raw_path = "raw_video.mp4"
+    final_path = "final_video.mp4"
+    print(f"📥 Found Video: {video_file['name']}")
 
-        # 3. Video Download Karna
-        print("Downloading video...")
-        request = drive.files().get_media(fileId=video['id'])
-        with open("video.mp4", "wb") as f:
-            f.write(request.execute())
+    # -- DOWNLOAD VIDEO --
+    request = drive.files().get_media(fileId=video_file['id'])
+    with open(raw_path, "wb") as f:
+        downloader = MediaIoBaseDownload(f, request)
+        done = False
+        while done is False:
+            status, done = downloader.next_chunk()
+    print("✅ Download Complete.")
 
-        # 4. RANDOM TITLE GENERATOR (Magic Yahan Hai)
-        print("Generating Viral Title...")
+    # -- EDIT & PROCESS --
+    try:
+        process_video(raw_path, final_path)
+        upload_file = final_path
+    except Exception as e:
+        print(f"❌ Editing Failed: {e}. Uploading Raw Video.")
+        upload_file = raw_path
 
-        # Ye wo list hai jisme se bot title pick karega
-        viral_titles_list = [
-            "Oddly Satisfying Video to Relax 🤤",
-            "The Most Satisfying Video Ever! ✨",
-            "Relaxing Visuals for Stress Relief 🎧",
-            "Can You Watch This Without Tingles? 😴",
-            "Deeply Satisfying ASMR 💤",
-            "Satisfying Art That Relaxes You ✨",
-            "This Will Make You Sleep Instantly 🌙",
-            "Oddly Satisfying Things 🤤",
-            "Brain Massage: Visual ASMR 🧠",
-            "Ultimate Stress Relief Video 💆‍♂️",
-            "Satisfying Cleaning & Crushing 💥",
-            "Wait for the end... So Satisfying! 😱",
-            "Instant Stress Relief (100% Works) ✨",
-            "Smooth and Relaxing Moments 🧊",
-            "Why is this so satisfying? 🧐",
-            "Video to Calm Your Anxiety 💖",
-            "Perfectly Satisfying Shorts 💯",
-            "Pure Satisfaction for Your Brain 🧠✨",
-            "Daily Dose of Satisfaction 💊",
-            "You Need to Watch This! 😲"
-        ]
+    # -- GENERATE TITLE & DESCRIPTION --
+    viral_titles_list = [
+        "Oddly Satisfying Video to Relax 🤤",
+        "The Most Satisfying Video Ever! ✨",
+        "Relaxing Visuals for Stress Relief 🎧",
+        "Can You Watch This Without Tingles? 😴",
+        "Deeply Satisfying ASMR 💤",
+        "Satisfying Art That Relaxes You ✨",
+        "This Will Make You Sleep Instantly 🌙",
+        "Oddly Satisfying Things 🤤",
+        "Brain Massage: Visual ASMR 🧠",
+        "Ultimate Stress Relief Video 💆‍♂️",
+        "Satisfying Cleaning & Crushing 💥",
+        "Wait for the end... So Satisfying! 😱",
+        "Instant Stress Relief (100% Works) ✨",
+        "Smooth and Relaxing Moments 🧊",
+        "Why is this so satisfying? 🧐",
+        "Video to Calm Your Anxiety 💖",
+        "Perfectly Satisfying Shorts 💯",
+        "Pure Satisfaction for Your Brain 🧠✨",
+        "Daily Dose of Satisfaction 💊",
+        "You Need to Watch This! 😲"
+    ]
 
-        # Randomly ek title chuno
-        selected_title = random.choice(viral_titles_list)
-        
-        # Title ke aage hashtags lagao
-        final_title = f"{selected_title} #Shorts #Satisfying"
+    selected_title = random.choice(viral_titles_list)
+    final_title = f"{selected_title} #Shorts #Satisfying"
 
-        print(f"Selected Title: {final_title}")
-
-        # --- DESCRIPTION ---
-        description_text = f"""
+    description_text = f"""
 {selected_title}
 
 This oddly satisfying video will help you relax, sleep, and relieve stress. 
 Enjoy the visual ASMR triggers! 🎧✨
 
 👇 SUBSCRIBE for Daily Relaxation!
-https://www.youtube.com/channel/UCyOFXSUnnR6-De_Xo4yTxBA
 
 ---
 #shorts #satisfying #oddlysatisfying #asmr #relaxing #stressrelief #calming #sleep #visualasmr #crunchy #viral #trending #cleaning #slime #satisfyingvideo
 """
+    viral_tags = [
+        'shorts', 'satisfying', 'oddly satisfying', 'asmr', 'relaxing', 
+        'stress relief', 'calming', 'sleep', 'visual asmr', 'crunchy', 
+        'slime', 'soap cutting', 'sand', 'viral', 'trending', 'youtube shorts'
+    ]
 
-        viral_tags = [
-            'shorts', 'satisfying', 'oddly satisfying', 'asmr', 'relaxing', 
-            'stress relief', 'calming', 'sleep', 'visual asmr', 'crunchy', 
-            'slime', 'soap cutting', 'sand', 'viral', 'trending', 'youtube shorts'
-        ]
-
+    # -- YOUTUBE UPLOAD --
+    try:
+        print(f"🎥 YouTube Uploading: {final_title}")
         body = {
             'snippet': {
-                'title': final_title,  
+                'title': final_title,
                 'description': description_text,
                 'tags': viral_tags,
                 'categoryId': '24' # Entertainment
             },
-            'status': {
-                'privacyStatus': 'public', 
-                'selfDeclaredMadeForKids': False
-            }
+            'status': {'privacyStatus': 'public', 'selfDeclaredMadeForKids': False}
         }
+        media = MediaFileUpload(upload_file, chunksize=-1, resumable=True)
+        youtube.videos().insert(part="snippet,status", body=body, media_body=media).execute()
+        print("✅ YouTube Upload Success!")
+    except Exception as e: print(f"❌ YouTube Failed: {e}")
 
-        media = MediaFileUpload("video.mp4", chunksize=-1, resumable=True)
-        upload = youtube.videos().insert(
-            part="snippet,status",
-            body=body,
-            media_body=media
-        ).execute()
-
-        print(f"Uploaded Successfully! Video ID: {upload['id']}")
-
-        # 5. Video Move Karna
-        print("Moving video to Done folder...")
-        file = drive.files().get(fileId=video['id'], fields='parents').execute()
-        previous_parents = ",".join(file.get('parents'))
+    # -- INSTAGRAM UPLOAD --
+    try:
+        print("📸 Instagram Uploading...")
+        cl = Client()
+        # Session load (INSTA_SETTINGS json secret se)
+        cl.set_settings(json.loads(os.environ['INSTA_SETTINGS']))
+        cl.login(os.environ['INSTA_USERNAME'], os.environ['INSTA_PASSWORD'])
         
-        drive.files().update(
-            fileId=video['id'],
-            addParents=DEST_FOLDER,
-            removeParents=previous_parents
-        ).execute()
-        print("Process Complete!")
+        insta_caption = f"{selected_title}\n.\nDouble Tap if this relaxed you! ❤️\n.\n#satisfying #asmr #oddlysatisfying #relax"
+        
+        cl.clip_upload(upload_file, insta_caption)
+        print("✅ Instagram Upload Success!")
+    except Exception as e: print(f"❌ Instagram Failed: {e}")
 
+    # -- CLEANUP --
+    print("🧹 Cleaning up...")
+    try:
+        drive.files().update(
+            fileId=video_file['id'], addParents=done_folder_id, removeParents=queue_folder_id
+        ).execute()
     except Exception as e:
-        print(f"Error aa gaya: {e}")
-        exit(1)
+        print(f"⚠️ Drive Move Failed: {e}")
+
+    if os.path.exists(raw_path): os.remove(raw_path)
+    if os.path.exists(final_path): os.remove(final_path)
+    print("🎉 All Done! Bot Finished.")
 
 if __name__ == "__main__":
     main()
